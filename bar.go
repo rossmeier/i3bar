@@ -225,8 +225,15 @@ func main() {
 	})
 
 	bat := battery.All().Output(func(i battery.Info) bar.Output {
-		return outputs.Textf("%.2fW %d%% (%d:%02d)",
-			-i.SignedPower(), i.RemainingPct(), int(i.RemainingTime().Hours()),
+		charging := ""
+		if i.PluggedIn() {
+			charging = "⚡"
+		} else if !i.Discharging() {
+			charging = "+"
+		}
+		i.SignedPower()
+		return outputs.Textf("%s%.2fW %d%% (%d:%02d)",
+			charging, i.Power, i.RemainingPct(), int(i.RemainingTime().Hours()),
 			int(i.RemainingTime().Minutes())%60)
 	})
 
