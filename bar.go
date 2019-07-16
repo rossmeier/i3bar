@@ -17,6 +17,7 @@ import (
 	"barista.run/bar"
 	"barista.run/base/click"
 	"barista.run/colors"
+	"barista.run/format"
 	"barista.run/modules/battery"
 	"barista.run/modules/clock"
 	"barista.run/modules/diskspace"
@@ -121,7 +122,7 @@ func main() {
 	*/
 
 	disk := diskspace.New("/").Output(func(i diskspace.Info) bar.Output {
-		return outputs.Textf("%s", outputs.IBytesize(i.Available))
+		return outputs.Textf("%s", format.IBytesize(i.Available))
 	})
 
 	screenshot := static.New(outputs.Text("SS").
@@ -258,7 +259,7 @@ func main() {
 	})
 	mem := meminfo.New().Output(func(i meminfo.Info) bar.Output {
 		return outputs.Textf("%s",
-			outputs.IBytesize(i["MemTotal"]-i["MemAvailable"]),
+			format.IBytesize(i["MemTotal"]-i["MemAvailable"]),
 		).OnClick(startTaskManager)
 	})
 
