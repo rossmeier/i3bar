@@ -145,11 +145,28 @@ func main() {
 			pango.Icon("ion-volume-"+iconName),
 			spacer,
 			pango.Textf("♪: %2d%%", pct),
-		)
+		).OnClick(func(e bar.Event) {
+			switch e.Button {
+			case bar.ScrollUp:
+				v.SetVolume(v.Vol + (v.Max-v.Min)/100)
+			case bar.ScrollDown:
+				v.SetVolume(v.Vol - (v.Max-v.Min)/100)
+			case bar.ButtonLeft:
+				if v.Mute {
+					v.SetMuted(false)
+				} else if e.X < e.Width/3 {
+					v.SetVolume(v.Vol - (v.Max-v.Min)/20)
+				} else if e.X < e.Width*2/3 {
+					v.SetMuted(true)
+				} else {
+					v.SetVolume(v.Vol + (v.Max-v.Min)/20)
+				}
+			}
+		})
 	})
 
 	refreshBrightness := make(chan struct{})
-	brightness := shell.New("light", "-G").Every(200 * time.Millisecond).
+	brightness := shell.New("light", "-G").Every(500 * time.Millisecond).
 		Output(func(value string) bar.Output {
 			i, err := strconv.ParseFloat(value, 64)
 			if err != nil {
