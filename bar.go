@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/c9s/goprocinfo/linux"
+	"github.com/fsnotify/fsnotify"
 
 	"barista.run"
 	"barista.run/bar"
@@ -28,6 +29,7 @@ import (
 	"barista.run/modules/shell"
 	"barista.run/modules/static"
 	"barista.run/modules/volume"
+	"barista.run/modules/volume/pulseaudio"
 	"barista.run/modules/wlan"
 	"barista.run/outputs"
 	"barista.run/pango"
@@ -128,7 +130,7 @@ func main() {
 	screenshot := static.New(outputs.Text("SS").
 		OnClick(startScreenshot))
 
-	vol := volume.DefaultSink().Output(func(v volume.Volume) bar.Output {
+	vol := volume.New(pulseaudio.DefaultSink()).Output(func(v volume.Volume) bar.Output {
 		if v.Mute {
 			return outputs.
 				Pango("♪: ", pango.Icon("ion-volume-off"), "-").
@@ -165,8 +167,7 @@ func main() {
 		})
 	})
 
-	refreshBrightness := make(chan struct{})
-	brightness := shell.New("light", "-G").Every(500 * time.Millisecond).
+	brightness := shell.New("light", "-G").
 		Output(func(value string) bar.Output {
 			i, err := strconv.ParseFloat(value, 64)
 			if err != nil {
@@ -177,24 +178,34 @@ func main() {
 					switch e.Button {
 					case bar.ScrollUp:
 						exec.Command("light", "-A", "1").Run()
-						refreshBrightness <- struct{}{}
 					case bar.ScrollDown:
 						exec.Command("light", "-U", "1").Run()
-						refreshBrightness <- struct{}{}
 					case bar.ButtonLeft:
 						if e.X > e.Width/2 {
 							exec.Command("light", "-A", "5").Run()
-							refreshBrightness <- struct{}{}
 						} else {
 							exec.Command("light", "-U", "5").Run()
-							refreshBrightness <- struct{}{}
 						}
 					}
 				})
 		})
 	go func() {
-		for range refreshBrightness {
-			brightness.Refresh()
+		// Fall back to polling if there is an error
+		defer brightness.Every(500 * time.Millisecond)
+
+		watcher, err := fsnotify.NewWatcher()
+		if err != nil {
+			return
+		}
+		err = watcher.Add("/sys/class/backlight/intel_backlight/brightness")
+		if err != nil {
+			return
+		}
+
+		for ev := range watcher.Events {
+			if ev.Op == fsnotify.Write {
+				brightness.Refresh()
+			}
 		}
 	}()
 
