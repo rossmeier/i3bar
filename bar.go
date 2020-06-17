@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/fsnotify/fsnotify"
+	"github.com/martinlindhe/unit"
 
 	"barista.run"
 	"barista.run/bar"
@@ -21,6 +22,7 @@ import (
 	"barista.run/format"
 	"barista.run/modules/battery"
 	"barista.run/modules/clock"
+	"barista.run/modules/cputemp"
 	"barista.run/modules/diskspace"
 	"barista.run/modules/funcs"
 	"barista.run/modules/media"
@@ -285,6 +287,11 @@ func main() {
 			float64(l)/float64(t)*100,
 		).OnClick(startTaskManager))
 	})
+
+	temp := cputemp.New().Output(func(t unit.Temperature) bar.Output {
+		return outputs.Textf("%.0f°C", t.Celsius())
+	})
+
 	mem := meminfo.New().Output(func(i meminfo.Info) bar.Output {
 		return outputs.Textf("%s",
 			format.IBytesize(i["MemTotal"]-i["MemAvailable"]),
@@ -311,6 +318,7 @@ func main() {
 		wifi,
 		bat,
 		cpu,
+		temp,
 		mem,
 		localtime,
 	))

@@ -7,6 +7,7 @@ require (
 	github.com/c9s/goprocinfo v0.0.0-20200130063400-86ec00c33cd5
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/golang/protobuf v1.3.3 // indirect
+	github.com/martinlindhe/unit v0.0.0-20190604142932-3b6be53d49af
 	golang.org/x/net v0.0.0-20200226051749-491c5fce7268 // indirect
 	gopkg.in/fsnotify.v1 v1.4.7
 )
