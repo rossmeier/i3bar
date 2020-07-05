@@ -255,6 +255,7 @@ func main() {
 		}
 	})
 
+	batLastRemaining := 1.0
 	bat := battery.All().Output(func(i battery.Info) bar.Output {
 		charging := ""
 		if i.PluggedIn() {
@@ -262,7 +263,14 @@ func main() {
 		} else if !i.Discharging() {
 			charging = "+"
 		}
-		i.SignedPower()
+		// Notify user about low battery
+		if i.Remaining() <= .15 && batLastRemaining > .15 {
+			exec.Command("dunstify", "Battery low (15% remaining)").Run()
+		}
+		if i.Remaining() <= .05 && batLastRemaining > .05 {
+			exec.Command("dunstify", "Battery low (5% remaining)", "-t", "0").Run()
+		}
+		batLastRemaining = i.Remaining()
 		return outputs.Textf("%s%.2fW %d%% (%d:%02d)",
 			charging, i.Power, i.RemainingPct(), int(i.RemainingTime().Hours()),
 			int(i.RemainingTime().Minutes())%60)
