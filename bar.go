@@ -13,6 +13,7 @@ import (
 
 	"github.com/c9s/goprocinfo/linux"
 	"github.com/fsnotify/fsnotify"
+	"github.com/godbus/dbus/v5"
 	"github.com/martinlindhe/unit"
 
 	"barista.run"
@@ -36,6 +37,16 @@ import (
 	"barista.run/outputs"
 	"barista.run/pango"
 )
+
+var bus = func() *dbus.Conn {
+	b, err := dbus.ConnectSessionBus()
+	if err != nil {
+		log.Println(err)
+		return nil
+	}
+
+	return b
+}()
 
 var spacer = pango.Text(" ").XXSmall()
 
@@ -82,14 +93,13 @@ func mediaFormatFunc(m media.Info) bar.Output {
 }
 
 var startTaskManager = click.RunLeft("i3-sensible-terminal", "-e", "htop")
-var startScreenshot = getScreenshotTool()
 
-func getScreenshotTool() func(bar.Event) {
+func runTool(executable string) func(bar.Event) {
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
 	}
-	return click.RunLeft(path.Join(usr.HomeDir, ".start/screenshot"))
+	return click.RunLeft(path.Join(usr.HomeDir, ".start", executable))
 }
 
 func home(path string) string {
@@ -130,7 +140,26 @@ func main() {
 	})
 
 	screenshot := static.New(outputs.Text("SS").
-		OnClick(startScreenshot))
+		OnClick(runTool("screenshot")))
+
+	keyboard := static.New(outputs.Text("⌨️").
+		OnClick(click.Left(func() {
+			obj := bus.Object("sm.puri.OSK0", "/sm/puri/OSK0")
+
+			prop, err := obj.GetProperty("sm.puri.OSK0.Visible")
+			if err != nil {
+				log.Println(err)
+				return
+			}
+
+			b, ok := prop.Value().(bool)
+			if !ok {
+				log.Println("Value not a bool")
+				return
+			}
+
+			obj.Call("sm.puri.OSK0.SetVisible", 0, !b)
+		})))
 
 	vol := volume.New(pulseaudio.DefaultSink()).Output(func(v volume.Volume) bar.Output {
 		if v.Mute {
@@ -320,6 +349,7 @@ func main() {
 	panic(barista.Run(
 		disk,
 		screenshot,
+		keyboard,
 		vol,
 		brightness,
 		net,
