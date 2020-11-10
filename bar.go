@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"image/color"
 	"log"
@@ -151,7 +152,7 @@ func (b *mybar) keyboard() {
 }
 
 func (b *mybar) vol() {
-	volume.New(pulseaudio.DefaultSink()).Output(func(v volume.Volume) bar.Output {
+	b.add(volume.New(pulseaudio.DefaultSink()).Output(func(v volume.Volume) bar.Output {
 		if v.Mute {
 			return outputs.
 				Pango("♪: ", pango.Icon("ion-volume-off"), "-").
@@ -186,10 +187,23 @@ func (b *mybar) vol() {
 				}
 			}
 		})
-	})
+	}))
 }
 
 func (b *mybar) brightness() {
+	stderr := &bytes.Buffer{}
+	cmd := exec.Command("light")
+	cmd.Stderr = stderr
+	if cmd.Run() != nil {
+		// light not installed
+		return
+	}
+
+	if stderr.Len() != 0 {
+		// light printed an error message
+		return
+	}
+
 	brightness := shell.New("light", "-G").
 		Output(func(value string) bar.Output {
 			i, err := strconv.ParseFloat(value, 64)
