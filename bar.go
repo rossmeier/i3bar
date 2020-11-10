@@ -110,39 +110,27 @@ func home(path string) string {
 	return filepath.Join(usr.HomeDir, path)
 }
 
-func main() {
-	/*
-		TODO: enable materials
-		material.Load(home("Github/material-design-icons"))
-		mdi.Load(home("Github/MaterialDesign-Webfont"))
-		typicons.Load(home("Github/typicons.font"))
-		ionicons.LoadMd(home("Github/ionicons"))
-		fontawesome.Load(home("Github/Font-Awesome"))
+type mybar struct {
+	mods []bar.Module
+}
 
-		colors.LoadBarConfig()
-		bg := colors.Scheme("background")
-		fg := colors.Scheme("statusline")
-		if fg != nil && bg != nil {
-			iconColor := fg.Colorful().BlendHcl(bg.Colorful(), 0.5).Clamped()
-			colors.Set("dim-icon", iconColor)
-			_, _, v := fg.Colorful().Hsv()
-			if v < 0.3 {
-				v = 0.3
-			}
-			colors.Set("bad", colorful.Hcl(40, 1.0, v).Clamped())
-			colors.Set("degraded", colorful.Hcl(90, 1.0, v).Clamped())
-			colors.Set("good", colorful.Hcl(120, 1.0, v).Clamped())
-		}
-	*/
+func (b *mybar) add(mod bar.Module) {
+	b.mods = append(b.mods, mod)
+}
 
-	disk := diskspace.New("/").Output(func(i diskspace.Info) bar.Output {
+func (b *mybar) disk() {
+	b.add(diskspace.New("/").Output(func(i diskspace.Info) bar.Output {
 		return outputs.Textf("%s", format.IBytesize(i.Available))
-	})
+	}))
+}
 
-	screenshot := static.New(outputs.Text("SS").
-		OnClick(runTool("screenshot")))
+func (b *mybar) screenshot() {
+	b.add(static.New(outputs.Text("SS").
+		OnClick(runTool("screenshot"))))
+}
 
-	keyboard := static.New(outputs.Text("⌨️").
+func (b *mybar) keyboard() {
+	b.add(static.New(outputs.Text("⌨️").
 		OnClick(click.Left(func() {
 			obj := bus.Object("sm.puri.OSK0", "/sm/puri/OSK0")
 
@@ -159,9 +147,11 @@ func main() {
 			}
 
 			obj.Call("sm.puri.OSK0.SetVisible", 0, !b)
-		})))
+		}))))
+}
 
-	vol := volume.New(pulseaudio.DefaultSink()).Output(func(v volume.Volume) bar.Output {
+func (b *mybar) vol() {
+	volume.New(pulseaudio.DefaultSink()).Output(func(v volume.Volume) bar.Output {
 		if v.Mute {
 			return outputs.
 				Pango("♪: ", pango.Icon("ion-volume-off"), "-").
@@ -197,7 +187,9 @@ func main() {
 			}
 		})
 	})
+}
 
+func (b *mybar) brightness() {
 	brightness := shell.New("light", "-G").
 		Output(func(value string) bar.Output {
 			i, err := strconv.ParseFloat(value, 64)
@@ -239,8 +231,11 @@ func main() {
 			}
 		}
 	}()
+	b.add(brightness)
+}
 
-	net := netinfo.Prefix("en").Output(func(s netinfo.State) bar.Output {
+func (b *mybar) net() {
+	b.add(netinfo.Prefix("en").Output(func(s netinfo.State) bar.Output {
 		if len(s.IPs) > 0 {
 			return outputs.Textf("E: %s", s.IPs[0]).Color(color.RGBA{
 				A: 255, G: 255,
@@ -257,9 +252,11 @@ func main() {
 			})
 		}
 		return nil
-	})
+	}))
+}
 
-	wifi := wlan.Any().Output(func(i wlan.Info) bar.Output {
+func (b *mybar) wifi() {
+	b.add(wlan.Any().Output(func(i wlan.Info) bar.Output {
 		freq := "2.4GHz"
 		if i.Frequency.Gigahertz() > 4 {
 			freq = "5GHz"
@@ -282,10 +279,12 @@ func main() {
 					A: 255, G: 255,
 				})
 		}
-	})
+	}))
+}
 
+func (b *mybar) bat() {
 	batLastRemaining := 1.0
-	bat := battery.All().Output(func(i battery.Info) bar.Output {
+	b.add(battery.All().Output(func(i battery.Info) bar.Output {
 		charging := ""
 		if i.PluggedIn() {
 			charging = "⚡"
@@ -303,11 +302,13 @@ func main() {
 		return outputs.Textf("%s%.2fW %d%% (%d:%02d)",
 			charging, i.Power, i.RemainingPct(), int(i.RemainingTime().Hours()),
 			int(i.RemainingTime().Minutes())%60)
-	})
+	}))
+}
 
+func (b *mybar) cpu() {
 	var lastload uint64
 	var lasttotal uint64
-	cpu := funcs.Every(time.Second, func(s bar.Sink) {
+	b.add(funcs.Every(time.Second, func(s bar.Sink) {
 		stat, err := linux.ReadStat("/proc/stat")
 		if err != nil {
 			s.Output(outputs.Text("").Error(err))
@@ -323,41 +324,50 @@ func main() {
 		s.Output(outputs.Textf("%.1f%%",
 			float64(l)/float64(t)*100,
 		).OnClick(startTaskManager))
-	})
+	}))
+}
 
-	temp := cputemp.New().Output(func(t unit.Temperature) bar.Output {
+func (b *mybar) temp() {
+	b.add(cputemp.New().Output(func(t unit.Temperature) bar.Output {
 		return outputs.Textf("%.0f°C", t.Celsius())
-	})
+	}))
+}
 
-	mem := meminfo.New().Output(func(i meminfo.Info) bar.Output {
+func (b *mybar) mem() {
+	b.add(meminfo.New().Output(func(i meminfo.Info) bar.Output {
 		return outputs.Textf("%s",
 			format.IBytesize(i["MemTotal"]-i["MemAvailable"]),
 		).OnClick(startTaskManager)
-	})
+	}))
+}
 
-	localtime := clock.Local().
+func (b *mybar) localtime() {
+	b.add(clock.Local().
 		Output(time.Second, func(now time.Time) bar.Output {
 			return outputs.Pango(
-				pango.Icon("material-today").Color(colors.Scheme("dim-icon")),
 				now.Format("02.01.2006 "),
-				pango.Icon("material-access-time").Color(colors.Scheme("dim-icon")),
-				//now.Format("15:04:05"),
 				now.Format("15:04"),
 			).OnClick(click.RunLeft("gsimplecal"))
-		})
+		}))
+}
 
-	panic(barista.Run(
-		disk,
-		screenshot,
-		keyboard,
-		vol,
-		brightness,
-		net,
-		wifi,
-		bat,
-		cpu,
-		temp,
-		mem,
-		localtime,
-	))
+func main() {
+	b := &mybar{
+		mods: make([]bar.Module, 0),
+	}
+
+	b.disk()
+	b.screenshot()
+	b.keyboard()
+	b.vol()
+	b.brightness()
+	b.net()
+	b.wifi()
+	b.bat()
+	b.cpu()
+	b.temp()
+	b.mem()
+	b.localtime()
+
+	panic(barista.Run(b.mods...))
 }
