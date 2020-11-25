@@ -51,6 +51,21 @@ var bus = func() *dbus.Conn {
 
 var spacer = pango.Text(" ").XXSmall()
 
+var rateLimits = make(map[string]time.Time)
+
+// returns true if limit for action "id" expired.
+//
+// Example (do stuff at most every 200 ms)
+//   if rateLimit("doStuff", 200*time.Millisecond) {
+//       doStuff()
+//   }
+func rateLimit(id string, limit time.Duration) bool {
+	now := time.Now()
+	last, ok := rateLimits[id]
+	rateLimits[id] = now
+	return !ok || now.Sub(last) > limit
+}
+
 func truncate(in string, l int) string {
 	if len([]rune(in)) <= l {
 		return in
@@ -126,8 +141,14 @@ func (b *mybar) disk() {
 }
 
 func (b *mybar) screenshot() {
+	handler := runTool("screenshot")
 	b.add(static.New(outputs.Text("SS").
-		OnClick(runTool("screenshot"))))
+		OnClick(func(e bar.Event) {
+			if rateLimit("screenshot", 200*time.Millisecond) {
+				time.Sleep(100 * time.Millisecond)
+				handler(e)
+			}
+		})))
 }
 
 func (b *mybar) keyboard() {
