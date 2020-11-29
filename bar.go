@@ -321,6 +321,9 @@ func (b *mybar) bat() {
 	batLastRemaining := 1.0
 	b.add(battery.All().Output(func(i battery.Info) bar.Output {
 		charging := ""
+		if i.Status == battery.Disconnected {
+			return nil
+		}
 		if i.PluggedIn() {
 			charging = "⚡"
 		} else if !i.Discharging() {
